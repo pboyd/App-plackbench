@@ -163,30 +163,27 @@ sub percentile {
 
 =head1 NAME
 
-average_request_time.pl - Benchmarking/Debugging tool for UI web requests
+plackbench - Benchmarking/Debugging tool for Plack web requests
 
 =head1 SYNOPSIS
 
-    # Do a navigation search 5 times
-    $ component/ui/bin/average_request_time.pl -n 5 admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+    # Make a request 5 times, and time the result
+    $ plackbench -n 5 /path/to/app.psgi '/search?q=stuff'
 
     # Debug the same request
-    $ perl -d component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+    $ plackbench -d -n 5 /path/to/app.psgi '/search?q=stuff'
 
     # Profile the same request
-    $ perl -d:NYTProf component/ui/bin/average_request_time.pl -n 5 admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+    $ plackbench -d:NYTProf -n 5 /path/to/app.psgi '/search?q=stuff'
     $ nytprofhtml -m
 
 =head1 USAGE
 
-  component/ui/bin/average_request_time.pl psgi_app URI
+  plackbench /path/to/app.psgi URI
 
-The first positional argument is the name of basename of a file in
-C<$VCM_HOME/component/ui/*.psgi>. Valid options, as of this writing, are admin,
-cobalt and internal_api.
+The first positional argument is the path to a .psgi file.
 
-The uri is relative to the application root (i.e. don't prefix Cobalt URI's
-with "/beta").
+The URI is relative to the application root.
 
 =head1 OPTIONS
 
@@ -195,10 +192,6 @@ with "/beta").
 =item -n
 
 Number of times to execute the request. Defaults to 1.
-
-=item --user
-
-User name to login with. Defaults to TEST_ADMIN_USER.
 
 =item --warm
 
@@ -227,12 +220,12 @@ profiler.
 
 Just invoking the script through NYTProf is all that's necessary:
 
-    perl -d:NYTProf /vcm/home/component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/info?type=strategy&strategy_id=-1&campaign_id=425509'
+    plackbench -d:NYTProf /path/to/app.psgi '/search?q=stuff'
 
-Startup costs frequently overshadow the actual request in the report. If this
-happens prevent NYTProf from starting by default:
+In some applications, startup costs can overshadow the actual request in the
+report. If this happens prevent NYTProf from starting by default:
 
-    NYTPROF=start=no perl -d:NYTProf /vcm/home/component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/info?type=strategy&strategy_id=-1&campaign_id=425509'
+    NYTPROF=start=no plackbench -d:NYTProf /path/to/app.psgi '/search?q=stuff'
 
 The script will call C<DB::enable_profile()> to start NYTProf before executing
 any requests. Which removes the startup code from the final report.

@@ -11,7 +11,7 @@ sub ok {
 
 sub slow {
     my $req = shift;
-    sleep 2;
+    sleep 1;
     return HTTP::Response->new(200, 'OK', [], 'slow');
 }
 
