@@ -1,0 +1,245 @@
+#!/bin/env perl
+
+use strict;
+use warnings;
+use autodie;
+use v5.10;
+
+use Getopt::Long qw();
+use HTTP::Request qw();
+use List::Util qw( sum reduce min max );
+use Plack::Test;
+use Plack::Util;
+use Scalar::Util qw( reftype );
+use Time::HiRes qw( gettimeofday tv_interval );
+
+my %opts = (
+    count => 1,
+    warm  => 0,
+);
+
+my $parser = Getopt::Long::Parser->new();
+$parser->configure('bundling');
+$parser->getoptions(
+    'n=i'            => \$opts{count},
+    'warm'           => \$opts{warm},
+    'post=s'         => \$opts{post_data},
+);
+
+my ($psgi_path, $uri) = @ARGV;
+unless ($psgi_path && $uri) {
+    say "Usage: $0 -n <num requests> /path/to/app.psgi <uri>";
+    exit 1;
+}
+
+$opts{post_data} &&= post_data($opts{post_data});
+
+my $app = Plack::Util::load_psgi($psgi_path);
+
+my @times = time_requests(
+    app     => $app,
+    uri     => $uri,
+    %opts
+);
+
+my $min = min(@times);
+my $mean = mean(@times);
+my $sd = standard_deviation(@times);
+my $max = max(@times);
+
+my @sorted_times = sort { $a <=> $b } @times;
+my $median = percentile(50, \@sorted_times);
+
+print "Request times (seconds):\n";
+printf("%8s %8s %8s %8s %8s\n", 'min', 'mean', 'sd', 'median', 'max');
+printf("%8.3f %8.3f %8.3f %8.3f %8.3f\n\n", $min, $mean, $sd, $median, $max);
+
+print "Percentage of requests within a certain time (seconds):\n";
+for my $percent (50, 66, 75, 80, 90, 95, 98, 99, 100) {
+    my $value = percentile($percent, \@sorted_times);
+    printf("%4d%% %8.3f\n", $percent, $value);
+}
+
+sub time_requests {
+    my %args = @_;
+
+    my $app     = $args{app};
+    my $uri     = $args{uri};
+    my $count   = $args{count};
+
+    my @requests;
+    if ($args{post_data}) {
+        @requests = map {
+            HTTP::Request->new(POST => $uri, Content => $_);
+        } @{$args{post_data}};
+    }
+    else {
+        @requests = (HTTP::Request->new(GET => $uri));
+    }
+
+    if ($args{warm}) {
+        make_request($app, $requests[0]);
+    }
+
+    if (DB->can('enable_profile')) {
+        DB::enable_profile();
+    }
+
+    my @times = map {
+        my $request_number = $_ % scalar(@requests);
+        time_request($app, $requests[$request_number])
+    } ( 0 .. ($count - 1) );
+
+    return wantarray ? @times : \@times;
+}
+
+sub time_request {
+    my @start = gettimeofday;
+    make_request(@_);
+    return tv_interval( \@start );
+}
+
+sub make_request {
+    my ($app, $request) = @_;
+
+    test_psgi $app, sub {
+        my $cb       = shift;
+        my $response = $cb->($request);
+        if ( $response->is_error() ) {
+            die "Request failed: " . $response->decoded_content;
+        }
+    };
+
+    return;
+}
+
+sub post_data {
+    my $file = shift;
+
+    my @bodies;
+    if ( $file eq '-' ) {
+        say 'Enter POST data. <Ctrl-D> when finished.';
+        @bodies = <STDIN>;
+    }
+    else {
+        open(my $fh, $file);
+        @bodies = <$fh>;
+        close($fh);
+    }
+
+    return [ grep $_, map { chomp; $_ } @bodies ];
+}
+
+sub mean {
+    my @data = @_;
+    return sum(@data) / scalar @data;
+}
+
+sub standard_deviation {
+    my @data = @_;
+
+    my $mean = mean(@data);
+
+    local ($a, $b);
+
+    my $differences_sum = reduce {
+        $a + (($b - $mean) ** 2)
+    } 0, @data;
+    
+    my $sd = sqrt($differences_sum / scalar(@data));
+    return $sd;
+}
+
+sub percentile {
+    # This assumes the input list is sorted
+
+    my ($percentile, $data) = @_;
+
+    my $n = ($percentile / 100) * scalar(@{$data}) + 0.5;
+    return $data->[int($n) - 1];
+}
+
+=pod
+
+=head1 NAME
+
+average_request_time.pl - Benchmarking/Debugging tool for UI web requests
+
+=head1 SYNOPSIS
+
+    # Do a navigation search 5 times
+    $ component/ui/bin/average_request_time.pl -n 5 admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+
+    # Debug the same request
+    $ perl -d component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+
+    # Profile the same request
+    $ perl -d:NYTProf component/ui/bin/average_request_time.pl -n 5 admin '/advertiser/dashboard/navigation/?type=search&search_string=test'
+    $ nytprofhtml -m
+
+=head1 USAGE
+
+  component/ui/bin/average_request_time.pl psgi_app URI
+
+The first positional argument is the name of basename of a file in
+C<$VCM_HOME/component/ui/*.psgi>. Valid options, as of this writing, are admin,
+cobalt and internal_api.
+
+The uri is relative to the application root (i.e. don't prefix Cobalt URI's
+with "/beta").
+
+=head1 OPTIONS
+
+=over 4
+
+=item -n
+
+Number of times to execute the request. Defaults to 1.
+
+=item --user
+
+User name to login with. Defaults to TEST_ADMIN_USER.
+
+=item --warm
+
+Make an initial request that won't be included in the stats.
+
+=item --post=<file>
+
+Make a POST request instead of a GET. Pass the path to a file with the raw
+URL-encoded POST data. If the file contains multiple lines, each will be used a
+separate POST request.
+
+If the file is a '-', the POST body will be read from STDIN.
+
+=back
+
+=head1 DESCRIPTION
+
+This script benchmarks a web request. It hits the Plack app directly without
+going through a web server.
+
+This is somewhat useful on it's own for getting an idea of the time spent in
+Perl-land for a web request. But it's mostly a harness for a debugger or
+profiler.
+
+=head2 Using with C<Devel::NYTProf>
+
+Just invoking the script through NYTProf is all that's necessary:
+
+    perl -d:NYTProf /vcm/home/component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/info?type=strategy&strategy_id=-1&campaign_id=425509'
+
+Startup costs frequently overshadow the actual request in the report. If this
+happens prevent NYTProf from starting by default:
+
+    NYTPROF=start=no perl -d:NYTProf /vcm/home/component/ui/bin/average_request_time.pl admin '/advertiser/dashboard/info?type=strategy&strategy_id=-1&campaign_id=425509'
+
+The script will call C<DB::enable_profile()> to start NYTProf before executing
+any requests. Which removes the startup code from the final report.
+
+If the C<--warm> flag is used, C<DB::enable_profile()> will be called after the
+initial request.
+
+Set L<Devel::NYTProf> for more information.
+
+=cut
