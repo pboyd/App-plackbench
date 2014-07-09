@@ -19,6 +19,12 @@ sub slow {
     return HTTP::Response->new(200, 'OK', [], 'slow');
 }
 
+my $last_request;
+sub _get_last_request {
+    my $app = shift;
+    return $last_request;
+}
+
 my $app = sub {
     my $request = shift;
 
@@ -31,11 +37,15 @@ my $app = sub {
         $response = $sub->($request);
     }
 
+    $last_request = $request;
+
     my @headers = map { $_ => $response->header($_) } $response->header_field_names();
 
     my $return = [$response->code(), \@headers, [ $response->decoded_content() ]];
     return $return;
 };
+
+bless($app, __PACKAGE__);
 
 # Make sure this is the last statement in the file:
 $app;

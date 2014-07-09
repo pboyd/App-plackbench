@@ -82,14 +82,14 @@ plackbench - Benchmarking/Debugging tool for Plack web requests
 
 =head1 SYNOPSIS
 
-    # Make a request 5 times, and time the result
+    # Make a request 5 times, and print some stats
     $ plackbench -n 5 /path/to/app.psgi '/search?q=stuff'
 
     # Debug the same request
-    $ plackbench -d -n 5 /path/to/app.psgi '/search?q=stuff'
+    $ PERL5OPT=-d plackbench -n 5 /path/to/app.psgi '/search?q=stuff'
 
     # Profile the same request
-    $ plackbench -d:NYTProf -n 5 /path/to/app.psgi '/search?q=stuff'
+    $ PERL5OPT=-d:NYTProf plackbench -n 5 /path/to/app.psgi '/search?q=stuff'
     $ nytprofhtml -m
 
 =head1 USAGE
@@ -135,12 +135,12 @@ profiler.
 
 Just invoking the script through NYTProf is all that's necessary:
 
-    plackbench -d:NYTProf /path/to/app.psgi '/search?q=stuff'
+    PERL5OPT=-d:NYTProf plackbench /path/to/app.psgi '/search?q=stuff'
 
 In some applications, startup costs can overshadow the actual request in the
 report. If this happens prevent NYTProf from starting by default:
 
-    NYTPROF=start=no plackbench -d:NYTProf /path/to/app.psgi '/search?q=stuff'
+    NYTPROF=start=no PERL5OPT=-d:NYTPRof plackbench /path/to/app.psgi '/search?q=stuff'
 
 The script will call C<DB::enable_profile()> to start NYTProf before executing
 any requests. Which removes the startup code from the final report.

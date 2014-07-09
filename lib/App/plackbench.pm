@@ -9,6 +9,7 @@ use HTTP::Request qw();
 use List::Util qw( reduce );
 use Plack::Test qw( test_psgi );
 use Plack::Util qw();
+use Scalar::Util qw( reftype );
 use Time::HiRes qw( gettimeofday tv_interval );
 
 use App::plackbench::Stats;
@@ -17,6 +18,7 @@ my %attributes = (
     app       => \&_build_app,
     count     => 1,
     warm      => 0,
+    fixup     => sub { [] },
     post_data => undef,
     psgi_path => undef,
     uri       => undef,
@@ -84,6 +86,14 @@ sub run {
     }
     else {
         @requests = ( HTTP::Request->new( GET => $uri ) );
+    }
+
+    my $fixups = $self->fixup();
+    $fixups = [$fixups] unless reftype($fixups) && reftype($fixups) eq 'ARRAY';
+    $fixups = [ grep { reftype($_) && reftype($_) eq 'CODE' } @{$fixups} ];
+
+    for my $request (@requests) {
+        $_->($request) for @{$fixups};
     }
 
     if ( $self->warm() ) {
