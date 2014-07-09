@@ -3,6 +3,10 @@ package App::plackbench::test_app;
 use strict;
 use warnings;
 
+# Sometimes this file gets loaded multiple times. Silence the "subroutine
+# redefined" warning when it is.
+no warnings 'redefine';
+
 use HTTP::Response;
 
 sub ok {

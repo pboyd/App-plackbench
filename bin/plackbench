@@ -6,114 +6,43 @@ use autodie;
 use v5.10;
 
 use Getopt::Long qw();
-use HTTP::Request qw();
-use List::Util qw( sum reduce min max );
-use Plack::Test;
-use Plack::Util;
-use Scalar::Util qw( reftype );
-use Time::HiRes qw( gettimeofday tv_interval );
 
-my %opts = (
-    count => 1,
-    warm  => 0,
-);
+use App::plackbench;
 
-my $parser = Getopt::Long::Parser->new();
-$parser->configure('bundling');
-$parser->getoptions(
-    'n=i'            => \$opts{count},
-    'warm'           => \$opts{warm},
-    'post=s'         => \$opts{post_data},
-);
+my $opts = _parse_argv(\@ARGV);
 
-my ($psgi_path, $uri) = @ARGV;
-unless ($psgi_path && $uri) {
+unless ( $opts->{psgi_path} && $opts->{uri} ) {
     say "Usage: $0 -n <num requests> /path/to/app.psgi <uri>";
     exit 1;
 }
+$opts->{post_data} &&= _post_data( $opts->{post_data} );
 
-$opts{post_data} &&= post_data($opts{post_data});
+my $bench = App::plackbench->new(%{$opts});
+my $stats = $bench->run();
+_report($stats);
 
-my $app = Plack::Util::load_psgi($psgi_path);
+exit 0;
 
-my @times = time_requests(
-    app     => $app,
-    uri     => $uri,
-    %opts
-);
+sub _parse_argv {
+    my $argv = shift;
 
-my $min = min(@times);
-my $mean = mean(@times);
-my $sd = standard_deviation(@times);
-my $max = max(@times);
+    my %opts;
 
-my @sorted_times = sort { $a <=> $b } @times;
-my $median = percentile(50, \@sorted_times);
+    my $parser = Getopt::Long::Parser->new();
+    $parser->configure('bundling');
+    $parser->getoptionsfromarray(
+        $argv,
+        'n=i'    => \$opts{count},
+        'warm'   => \$opts{warm},
+        'post=s' => \$opts{post_data},
+    );
 
-print "Request times (seconds):\n";
-printf("%8s %8s %8s %8s %8s\n", 'min', 'mean', 'sd', 'median', 'max');
-printf("%8.3f %8.3f %8.3f %8.3f %8.3f\n\n", $min, $mean, $sd, $median, $max);
+    ( $opts{psgi_path}, $opts{uri} ) = @{$argv};
 
-print "Percentage of requests within a certain time (seconds):\n";
-for my $percent (50, 66, 75, 80, 90, 95, 98, 99, 100) {
-    my $value = percentile($percent, \@sorted_times);
-    printf("%4d%% %8.3f\n", $percent, $value);
+    return \%opts;
 }
 
-sub time_requests {
-    my %args = @_;
-
-    my $app     = $args{app};
-    my $uri     = $args{uri};
-    my $count   = $args{count};
-
-    my @requests;
-    if ($args{post_data}) {
-        @requests = map {
-            HTTP::Request->new(POST => $uri, Content => $_);
-        } @{$args{post_data}};
-    }
-    else {
-        @requests = (HTTP::Request->new(GET => $uri));
-    }
-
-    if ($args{warm}) {
-        make_request($app, $requests[0]);
-    }
-
-    if (DB->can('enable_profile')) {
-        DB::enable_profile();
-    }
-
-    my @times = map {
-        my $request_number = $_ % scalar(@requests);
-        time_request($app, $requests[$request_number])
-    } ( 0 .. ($count - 1) );
-
-    return wantarray ? @times : \@times;
-}
-
-sub time_request {
-    my @start = gettimeofday;
-    make_request(@_);
-    return tv_interval( \@start );
-}
-
-sub make_request {
-    my ($app, $request) = @_;
-
-    test_psgi $app, sub {
-        my $cb       = shift;
-        my $response = $cb->($request);
-        if ( $response->is_error() ) {
-            die "Request failed: " . $response->decoded_content;
-        }
-    };
-
-    return;
-}
-
-sub post_data {
+sub _post_data {
     my $file = shift;
 
     my @bodies;
@@ -122,7 +51,7 @@ sub post_data {
         @bodies = <STDIN>;
     }
     else {
-        open(my $fh, $file);
+        open( my $fh, $file );
         @bodies = <$fh>;
         close($fh);
     }
@@ -130,33 +59,19 @@ sub post_data {
     return [ grep $_, map { chomp; $_ } @bodies ];
 }
 
-sub mean {
-    my @data = @_;
-    return sum(@data) / scalar @data;
-}
+sub _report {
+    my $stats = shift;
 
-sub standard_deviation {
-    my @data = @_;
+    print "Request times (seconds):\n";
+    printf( "%8s %8s %8s %8s %8s\n", 'min', 'mean', 'sd', 'median', 'max' );
+    printf( "%8.3f %8.3f %8.3f %8.3f %8.3f\n\n",
+        $stats->min(), $stats->mean(), $stats->standard_deviation(), $stats->median(), $stats->max() );
 
-    my $mean = mean(@data);
-
-    local ($a, $b);
-
-    my $differences_sum = reduce {
-        $a + (($b - $mean) ** 2)
-    } 0, @data;
-    
-    my $sd = sqrt($differences_sum / scalar(@data));
-    return $sd;
-}
-
-sub percentile {
-    # This assumes the input list is sorted
-
-    my ($percentile, $data) = @_;
-
-    my $n = ($percentile / 100) * scalar(@{$data}) + 0.5;
-    return $data->[int($n) - 1];
+    print "Percentage of requests within a certain time (seconds):\n";
+    for my $percent ( 50, 66, 75, 80, 90, 95, 98, 99, 100 ) {
+        my $value = $stats->percentile( $percent );
+        printf( "%4d%% %8.3f\n", $percent, $value );
+    }
 }
 
 =pod
