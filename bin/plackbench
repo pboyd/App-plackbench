@@ -39,6 +39,10 @@ sub _parse_argv {
 
     ( $opts{psgi_path}, $opts{uri} ) = @{$argv};
 
+    for (keys %opts) {
+        delete $opts{$_} unless defined $opts{$_};
+    }
+
     return \%opts;
 }
 
