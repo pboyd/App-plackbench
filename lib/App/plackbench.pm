@@ -80,9 +80,12 @@ sub run {
     my $count = $self->count();
 
     my @requests;
-    if ( $args{post_data} ) {
-        @requests = map { HTTP::Request->new( POST => $uri, Content => $_ ); }
-          @{ $args{post_data} };
+    if ( $self->post_data() ) {
+        @requests = map {
+            my $req = HTTP::Request->new( POST => $uri );
+            $req->content($_);
+            $req;
+        } @{ $self->post_data() };
     }
     else {
         @requests = ( HTTP::Request->new( GET => $uri ) );

@@ -19,10 +19,15 @@ sub slow {
     return HTTP::Response->new(200, 'OK', [], 'slow');
 }
 
-my $last_request;
-sub _get_last_request {
+my @requests;
+sub _get_requests {
     my $app = shift;
-    return $last_request;
+    return \@requests;
+}
+
+sub _clear_requests {
+    my $app = shift;
+    @requests = ();
 }
 
 my $app = sub {
@@ -37,7 +42,7 @@ my $app = sub {
         $response = $sub->($request);
     }
 
-    $last_request = $request;
+    push @requests, $request;
 
     my @headers = map { $_ => $response->header($_) } $response->header_field_names();
 
