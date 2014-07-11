@@ -121,7 +121,8 @@ profiler.
 
   plackbench /path/to/app.psgi URI
 
-The first positional argument is the path to a .psgi file.
+The first positional argument is the path to a .psgi file. The second is the
+URL to request.
 
 The URI is relative to the application root.
 
