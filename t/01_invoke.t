@@ -16,4 +16,10 @@ $output = `$script -n 10 $Bin/test_app.psgi /ok`;
 ok(!$?, 'should exit successfully');
 like($output, qr/Request times/, 'should output something reasonable');
 
+$output = `$script -e'\$_->url("/fail")' $Bin/test_app.psgi /ok`;
+ok($?, 'should use -e flag as a fixup');
+
+$output = `$script -f $Bin/fail_redirect $Bin/test_app.psgi /ok`;
+ok($?, 'should use -f flag as a fixup file path');
+
 done_testing();

@@ -17,7 +17,17 @@ unless ( $opts->{psgi_path} && $opts->{uri} ) {
 }
 $opts->{post_data} &&= _post_data( $opts->{post_data} );
 
+if ($opts->{fixup}) {
+    my $sub = eval("sub { \$_ = shift; $opts->{fixup} }");
+    $opts->{fixup} = [$sub];
+}
+
 my $bench = App::plackbench->new(%{$opts});
+
+if ($opts->{fixup_files}) {
+    $bench->add_fixup_from_file($opts->{fixup_files});
+}
+
 my $stats = $bench->run();
 _report($stats);
 
@@ -35,6 +45,8 @@ sub _parse_argv {
         'n=i'    => \$opts{count},
         'warm'   => \$opts{warm},
         'post=s' => \$opts{post_data},
+        'e=s'    => \$opts{fixup},
+        'f=s'    => \$opts{fixup_files},
     );
 
     ( $opts{psgi_path}, $opts{uri} ) = @{$argv};
@@ -124,6 +136,31 @@ separate POST request.
 
 If the file is a '-', the POST body will be read from STDIN.
 
+=item -e <code>
+
+Pre-process the request using the Perl code passed. C<$_> will be set to a
+L<HTTP::Request> object.
+
+For example, to set the User-Agent:
+
+    plackbench -e '$_->header("User-Agent" => "Mozilla")' /path/to/app.psgi /
+
+=item -f <file>
+
+Like C<-e>, however the code is read from a file. Should return a code
+reference, which will be passed a C<HTTP::Request> object.
+
+A simple example:
+
+    sub {
+        my $request = shift;
+        $request->header( Cookie => 'session=mysid' );
+        return;
+    }
+
+The file can contain any valid Perl code, but the last statement in the file
+must be a subroutine reference.
+
 =back
 
 =head1 DESCRIPTION
@@ -152,6 +189,6 @@ any requests. Which removes the startup code from the final report.
 If the C<--warm> flag is used, C<DB::enable_profile()> will be called after the
 initial request.
 
-Set L<Devel::NYTProf> for more information.
+See L<Devel::NYTProf> for more information.
 
 =cut

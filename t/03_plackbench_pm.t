@@ -4,16 +4,19 @@ use warnings;
 use Test::More;
 use Test::Deep;
 
+use Scalar::Util qw( reftype );
+
 use FindBin qw( $Bin );
 my $psgi_path = "$Bin/test_app.psgi";
 
 use App::plackbench;
 
-subtest 'attribute' => \&test_attributes;
-subtest 'run'       => \&test_run;
-subtest 'fixup'     => \&test_fixup;
-subtest 'POST'     => \&test_post_data;
-subtest 'warm'     => \&test_warm;
+subtest 'attribute'       => \&test_attributes;
+subtest 'run'             => \&test_run;
+subtest 'fixup'           => \&test_fixup;
+subtest 'POST'            => \&test_post_data;
+subtest 'warm'            => \&test_warm;
+subtest 'fixup_from_file' => \&test_fixup_from_file;
 done_testing();
 
 sub test_attributes {
@@ -73,13 +76,9 @@ sub test_fixup {
     is( $bench->app->_get_requests()->[-1]->{HTTP_FOOBAR},
         '1.0', 'changes made to the request should be kept' );
 
-    $bench->fixup( sub { $counter++ } );
-    $bench->run();
-    is( $counter, 2, 'non-arrayref single fixup sub should be called, too' );
-
-    $bench->fixup('asdf');
+    $bench->fixup([{}]);
     eval { $bench->run(); };
-    ok( !$@, 'should ignore non-coderefs in fixup()' );
+    ok( !$@, 'should ignore non-coderefs and non-strings in fixup()' );
 
     return;
 }
@@ -125,4 +124,43 @@ sub test_warm {
 
     is($stats->count(), $count, 'should put as many requests into the stats as asked for');
     is(scalar(@{$bench->app()->_get_requests()}), $count, 'should not make an extra request when "warm" is disabled');
+
+    return;
+}
+
+sub test_fixup_from_file {
+    my $bench = App::plackbench->new(
+        psgi_path => $psgi_path,
+        uri       => '/ok',
+    );
+
+    ok($bench->run()->mean(), 'should run ok to begin with');
+
+    $bench->add_fixup_from_file("$Bin/fail_redirect");
+
+    eval {
+        $bench->run();
+    };
+    like($@, qr/failed/, 'should eval the file and use it\'s sub');
+
+    $bench->fixup(undef);
+    $bench->add_fixup_from_file("$Bin/fail_redirect");
+    is(reftype($bench->fixup()->[0]), 'CODE', 'should initialize fixup() if necessary');
+
+    eval {
+        $bench->add_fixup_from_file("$Bin/does_not_exist");
+    };
+    like($@, qr/No such file/, 'should die when file doesn\'t exist');
+
+    eval {
+        $bench->add_fixup_from_file("$Bin/syntax_error");
+    };
+    like($@, qr#\Q$Bin/syntax_error#, 'should die when file doesn\'t compile');
+
+    eval {
+        $bench->add_fixup_from_file("$Bin/non_sub");
+    };
+    like($@, qr/does not return a subroutine/, 'should die when file doesn\'t return a subroutine reference');
+
+    return;
 }

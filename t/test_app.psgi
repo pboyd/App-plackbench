@@ -19,6 +19,11 @@ sub slow {
     return HTTP::Response->new(200, 'OK', [], 'slow');
 }
 
+sub fail {
+    my $req = shift;
+    return HTTP::Response->new(500, 'Internal Server Error', [], 'Danger!');
+}
+
 my @requests;
 sub _get_requests {
     my $app = shift;

@@ -76,31 +76,12 @@ sub run {
     my %args = @_;
 
     my $app   = $self->app();
-    my $uri   = $self->uri();
     my $count = $self->count();
 
-    my @requests;
-    if ( $self->post_data() ) {
-        @requests = map {
-            my $req = HTTP::Request->new( POST => $uri );
-            $req->content($_);
-            $req;
-        } @{ $self->post_data() };
-    }
-    else {
-        @requests = ( HTTP::Request->new( GET => $uri ) );
-    }
-
-    my $fixups = $self->fixup();
-    $fixups = [$fixups] unless reftype($fixups) && reftype($fixups) eq 'ARRAY';
-    $fixups = [ grep { reftype($_) && reftype($_) eq 'CODE' } @{$fixups} ];
-
-    for my $request (@requests) {
-        $_->($request) for @{$fixups};
-    }
+    my $requests = $self->_create_requests();
 
     if ( $self->warm() ) {
-        $self->_make_request( $requests[0] );
+        $self->_execute_request( $requests->[0] );
     }
 
     # If it's possible to enable NYTProf, then do so now.
@@ -109,8 +90,8 @@ sub run {
     }
 
     my $stats = reduce {
-        my $request_number = $b % scalar(@requests);
-        my $request = $requests[$request_number];
+        my $request_number = $b % scalar(@{$requests});
+        my $request = $requests->[$request_number];
 
         my $elapsed = $self->_time_request( $request );
         $a->insert($elapsed);
@@ -124,11 +105,69 @@ sub _time_request {
     my $self = shift;
 
     my @start = gettimeofday;
-    $self->_make_request(@_);
+    $self->_execute_request(@_);
     return tv_interval( \@start );
 }
 
-sub _make_request {
+sub _create_requests {
+    my $self = shift;
+
+    my @requests;
+    if ( $self->post_data() ) {
+        @requests = map {
+            my $req = HTTP::Request->new( POST => $self->uri() );
+            $req->content($_);
+            $req;
+        } @{ $self->post_data() };
+    }
+    else {
+        @requests = ( HTTP::Request->new( GET => $self->uri() ) );
+    }
+
+    $self->_fixup_requests(\@requests);
+
+    return \@requests;
+}
+
+sub _fixup_requests {
+    my $self = shift;
+    my $requests = shift;
+
+    my $fixups = $self->fixup();
+    $fixups = [ grep { reftype($_) && reftype($_) eq 'CODE' } @{$fixups} ];
+
+    for my $request (@{$requests}) {
+        $_->($request) for @{$fixups};
+    }
+
+    return;
+}
+
+sub add_fixup_from_file {
+    my $self = shift;
+    my $file = shift;
+
+    my $sub = do $file;
+
+    if (!$sub) {
+        die($@ || $!);
+    }
+
+    if (!reftype($sub) || !reftype($sub) eq 'CODE') {
+        die("$file: does not return a subroutine reference");
+    }
+
+    my $existing = $self->fixup();
+    if (!$existing || !reftype($existing) || reftype($existing) ne 'ARRAY') {
+        $self->fixup([]);
+    }
+
+    push @{$self->fixup()}, $sub;
+
+    return;
+}
+
+sub _execute_request {
     my $self = shift;
     my $request = shift;
 
