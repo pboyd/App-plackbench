@@ -188,8 +188,88 @@ __END__
 
 =head1 NAME
 
-App::plackbench
+App::plackbench - programmatic interface to plackbench
 
-=head2 SEE ALSO
+B<See L<plackbench> for the command line tool.>
 
-L<plackbench>
+=head1 SYNOPSIS
+
+    my $bench = App::plackbench->new(
+        psgi_path => $psgi_path,
+        count     => 5,
+        uri       => '/some/path',
+    );
+    my $stats = $bench->run();
+
+    printf("Averaged %8.3f seconds over %d requests\n", $stats->mean(), $stats->count());
+
+=head1 DESCRIPTION
+
+Class for executing requests on a L<Plack> application and recording stats.
+
+=head1 ATTRIBUTES
+
+=head2 app
+
+Defaults to a L<Plack> app loaded from L<psgi_path>, using L<Plack::Util/load_psgi>.
+
+=head2 count
+
+Number of times to execute the request. Defaults to 1.
+
+=head2 warm
+
+If true, an initial request will be made which won't be included in the stats.
+Defaults to false.
+
+=head2 fixup
+
+An arrayref of subroutine references to do any preprocessing of the request.
+Each subroutine reference will be called in order (though you shouldn't rely on
+that) and passed a reference to the L<HTTP::Request> object.
+
+Each sub will be called once for every unique request. Under a normal GET
+request, there will only be one unique request. However if L</post_data> is
+being used there will be one unique request for request body.
+
+The return value from the subs is ignored.
+
+=head2 post_data
+
+An arrayref of request bodies. If set, POST requests will be made instead of
+GET requests.
+
+If multiple request bodies are set they will be rotated through. This can be
+useful, for instance, to cycle through possible values for a field.
+
+=head2 psgi_path
+
+The path to the L<Plack> application to be tested.
+
+=head2 uri
+
+The URI to request on the app.
+
+=head1 CONSTRUCTOR
+
+=head2 C<new(%attributes)>
+
+Returns a new instance of C<App::plackbench>. Any arguments will be used a
+attribute settings.
+
+=head1 METHODS
+
+=head2 C<run()>
+
+Executes the requests (using the current attribute settings), and returns an
+L<App::plackbench::Stats> object. Takes no arguments.
+
+=head2 C<add_fixup_from_file($file)>
+
+Evaluates C<$file> and appends the returned subroutine reference to L</fixups>.
+If the file can't be parsed, or if it doesn't return a subroutine reference the
+method will L<die|perlfunc/die>.
+
+=head1 SEE ALSO
+
+L<plackbench>, L<Plack>

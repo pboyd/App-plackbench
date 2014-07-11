@@ -108,6 +108,15 @@ plackbench - Benchmarking/Debugging tool for Plack web requests
     $ PERL5OPT=-d:NYTProf plackbench -n 5 /path/to/app.psgi '/search?q=stuff'
     $ nytprofhtml -m
 
+=head1 DESCRIPTION
+
+This script benchmarks a web request. It hits the Plack app directly without
+going through a web server.
+
+This is somewhat useful on it's own for getting an idea of the time spent in
+Perl-land for a web request. But it's mostly a harness for a debugger or
+profiler.
+
 =head1 USAGE
 
   plackbench /path/to/app.psgi URI
@@ -163,16 +172,7 @@ must be a subroutine reference.
 
 =back
 
-=head1 DESCRIPTION
-
-This script benchmarks a web request. It hits the Plack app directly without
-going through a web server.
-
-This is somewhat useful on it's own for getting an idea of the time spent in
-Perl-land for a web request. But it's mostly a harness for a debugger or
-profiler.
-
-=head2 Using with C<Devel::NYTProf>
+=head1 Using with L<Devel::NYTProf>
 
 Just invoking the script through NYTProf is all that's necessary:
 
