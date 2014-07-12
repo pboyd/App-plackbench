@@ -150,7 +150,11 @@ sub test_fixup_from_file {
     eval {
         $bench->add_fixup_from_file("$Bin/does_not_exist");
     };
-    like($@, qr/No such file/, 'should die when file doesn\'t exist');
+    
+    # Don't try and check that the error contains "No such file", cause that's
+    # a different error in German (just sayin', it's not it came up or
+    # anything...)
+    ok($@, 'should die when file doesn\'t exist');
 
     eval {
         $bench->add_fixup_from_file("$Bin/syntax_error");
