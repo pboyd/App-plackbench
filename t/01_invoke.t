@@ -4,7 +4,7 @@ use warnings;
 use Test::More;
 
 use FindBin qw( $Bin );
-my $script = "$Bin/../bin/plackbench";
+my $script = "$^X $Bin/../bin/plackbench";
 
 my $output;
 
