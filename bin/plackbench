@@ -38,9 +38,8 @@ sub _parse_argv {
 
     my %opts;
 
-    my $parser = Getopt::Long::Parser->new();
-    $parser->configure('bundling');
-    $parser->getoptionsfromarray(
+    Getopt::Long::Configure('bundling');
+    Getopt::Long::GetOptionsFromArray(
         $argv,
         'n=i'    => \$opts{count},
         'warm'   => \$opts{warm},
