@@ -191,4 +191,15 @@ initial request.
 
 See L<Devel::NYTProf> for more information.
 
+=head1 AUTHOR
+
+Paul Boyd <boyd.paul2@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2014 by Paul Boyd.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
 =cut

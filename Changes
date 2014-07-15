@@ -1,3 +1,8 @@
+0.4  2014-07-14
+      - Clean up the test output.
+      - Adding some missing standard POD headers
+      - Specify required Perl version (5.10.1).
+
 0.3  2014-07-12
       - Attempting to fix 01_invoke.t on Win32
 
