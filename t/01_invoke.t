@@ -1,25 +1,37 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 6;
+use Class::Load qw( try_load_class );
 
 use FindBin qw( $Bin );
-my $script = "$^X $Bin/../bin/plackbench";
+my $command = "$^X $Bin/../bin/plackbench";
 
-my $output;
+SKIP: {
+    if ( !try_load_class('Capture::Tiny') ) {
+        skip 'Capture::Tiny not installed', 6;
+    }
 
-$output = `$script`;
-like($output, qr/Usage/, 'should output a usage message with no args');
-ok($?, 'should exit unsuccessfully when passed no args');
+    my ($stdout, $stderr, $exit);
 
-$output = `$script -n 10 $Bin/test_app.psgi /ok`;
-ok(!$?, 'should exit successfully');
-like($output, qr/Request times/, 'should output something reasonable');
+    ($stdout, $stderr, $exit) = run($command);
+    like($stdout, qr/Usage/, 'should output a usage message with no args');
+    ok($exit, 'should exit unsuccessfully when passed no args');
 
-$output = `$script -e'\$_->url("/fail")' $Bin/test_app.psgi /ok`;
-ok($?, 'should use -e flag as a fixup');
+    ($stdout, $stderr, $exit) = run("$command -n 10 $Bin/test_app.psgi /ok");
+    ok(!$exit, 'should exit successfully');
+    like($stdout, qr/Request times/, 'should output something reasonable');
 
-$output = `$script -f $Bin/fail_redirect $Bin/test_app.psgi /ok`;
-ok($?, 'should use -f flag as a fixup file path');
+    ($stdout, $stderr, $exit) = run("$command -e'\$_->url(\"/fail\")' $Bin/test_app.psgi /ok");
+    ok($exit, 'should use -e flag as a fixup');
 
-done_testing();
+    ($stdout, $stderr, $exit) = run("$command -f $Bin/fail_redirect $Bin/test_app.psgi /ok");
+    ok($exit, 'should use -f flag as a fixup file path');
+}
+
+sub run {
+    my $command = shift;
+    return Capture::Tiny::capture(sub {
+        system($command);
+    });
+}

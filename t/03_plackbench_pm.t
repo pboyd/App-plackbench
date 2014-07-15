@@ -4,8 +4,6 @@ use warnings;
 use Test::More;
 use Test::Deep;
 
-use Scalar::Util qw( reftype );
-
 use FindBin qw( $Bin );
 my $psgi_path = "$Bin/test_app.psgi";
 
@@ -145,7 +143,7 @@ sub test_fixup_from_file {
 
     $bench->fixup(undef);
     $bench->add_fixup_from_file("$Bin/fail_redirect");
-    is(reftype($bench->fixup()->[0]), 'CODE', 'should initialize fixup() if necessary');
+    is(Scalar::Util::reftype($bench->fixup()->[0]), 'CODE', 'should initialize fixup() if necessary');
 
     eval {
         $bench->add_fixup_from_file("$Bin/does_not_exist");
