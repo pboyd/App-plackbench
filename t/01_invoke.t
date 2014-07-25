@@ -22,7 +22,12 @@ SKIP: {
     ok(!$exit, 'should exit successfully');
     like($stdout, qr/Request times/, 'should output something reasonable');
 
-    ($stdout, $stderr, $exit) = run("$command -e'\$_->url(\"/fail\")' $Bin/test_app.psgi /ok");
+    my $e_arg = q[-e'$_->url("/fail")'];
+    if ($^O eq 'MSWin32') {
+        $e_arg = q[-e"$_->url('/fail')"];
+    }
+
+    ($stdout, $stderr, $exit) = run("$command $e_arg $Bin/test_app.psgi /ok");
     ok($exit, 'should use -e flag as a fixup');
 
     ($stdout, $stderr, $exit) = run("$command -f $Bin/fail_redirect $Bin/test_app.psgi /ok");
