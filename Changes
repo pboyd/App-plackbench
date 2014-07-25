@@ -1,3 +1,6 @@
+0.5  2014-07-25
+      - Fix test failures on Windows
+
 0.4  2014-07-14
       - Clean up the test output.
       - Adding some missing standard POD headers
