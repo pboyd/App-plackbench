@@ -82,6 +82,8 @@ sub _report {
     $opts->{precision} //= 3;
     my $time = "%8.$opts->{precision}f";
 
+    printf "Rate (requests per second): %.2f\n\n", $stats->rate;
+
     print "Request times (seconds):\n";
     printf( "%8s %8s %8s %8s %8s\n", 'min', 'mean', 'sd', 'median', 'max' );
     printf( "$time $time $time $time $time\n\n",
