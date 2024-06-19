@@ -17,18 +17,15 @@ sub insert {
     my $self = shift;
     my $n = shift;
 
-    my $index = $self->count();
+    push @{$self}, $n;
+    return $self->count();
+}
 
-    for (my $i = 0; $i < $self->count(); $i++) {
-        if ($n < $self->[$i]) {
-            $index = $i;
-            last;
-        }
-    }
+sub finalize {
+    my $self = shift;
 
-    splice(@{$self}, $index, 0, $n);
-
-    return $index;
+    @{$self} = sort { $a <=> $b } @{$self};
+    return $self;
 }
 
 sub count {

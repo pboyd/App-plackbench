@@ -104,6 +104,7 @@ sub run {
         $a;
     }  App::plackbench::Stats->new(), ( 0 .. ( $count - 1 ) );
 
+    $stats->finalize;
     return $stats;
 }
 
